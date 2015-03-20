@@ -1,0 +1,372 @@
+USE [database]
+GO
+/****** Object:  StoredProcedure [dbo].[Table_SP_Sample_Wise_Summary_Report]    Script Date: 3/20/2015 1:59:10 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+/* Useful queries for testing purpose */
+-- select * from [database].[dbo].Table_Workitem_Status_Audit_Table order by event_date
+-- select * from [database].[dbo].[Table_Ext_Table_Test]
+-- exec Table_SP_Sample_Wise_Summary_Report '2014-01-01','2015-12-12'
+-- exec Table_SP_Sample_Wise_Summary_Report '2014-01-01','2015-12-12'
+
+CREATE PROCEDURE [dbo].[Table_SP_Sample_Wise_Summary_Report] (@p_start_date DATE,
+@p_end_date DATE)
+
+AS
+BEGIN
+
+/*Creating a temporary Table */
+CREATE TABLE #Table_Sample_Wise_Summary_Report_Temp_Table
+(
+	[Sample] [varchar](50) NULL,
+	[Total_Logged] [varchar](50) NULL,
+	[Open_out_of_Logged] [varchar](50) NULL,
+	[Closed_out_of_Logged] [varchar](50) NULL,
+	[TOT_Resolved] [varchar](50) NULL,
+	[Resolved_Days_0_2] [varchar](50) NULL,
+	[Resolved_Days_3_5] [varchar](50) NULL,
+	[Resolved_Days_6_10] [varchar](50) NULL,
+	[Resolved_Days_11_15] [varchar](50) NULL,
+	[Resolved_Greater_15] [varchar](50) NULL,
+	[Resolved_IN_10d_SLA_prc] [varchar](50) NULL,
+	[Resolved_OUT_10d_SLA_prc] [varchar](50) NULL,
+	[TOT_Open] [varchar](50) NULL,
+	[Open_Days_0_2] [varchar](50) NULL,
+	[Open_Days_3_5] [varchar](50) NULL,
+	[Open_Days_6_10] [varchar](50) NULL,
+	[Open_Days_11_15] [varchar](50) NULL,
+	[Open_Greater_15] [varchar](50) NULL,
+	[Open_IN_10d_SLA_prc] [varchar](50) NULL,
+	[Open_OUT_10d_SLA_prc] [varchar](50) NULL,
+	[Fail_1] [varchar](50) NULL,
+	[Fail_2] [varchar](50) NULL,
+	[Fail_3] [varchar](50) NULL
+) ON [PRIMARY];
+
+/* Declaring Variables as Report's Column Name */
+Declare @Lv_Sample varchar(50);
+Declare @Lv_TOT_Open INT =0 ;
+Declare @Lv_Open_Days_0_2 INT =0;
+Declare @Lv_Open_Days_3_5 INT =0;
+Declare @Lv_Open_Days_6_10 INT =0;
+Declare @Lv_Open_Days_11_15 INT =0;
+Declare @Lv_Open_Greater_15 INT =0;
+Declare @Lv_Open_IN_10d_SLA_prc INT =0;
+Declare @Lv_Open_OUT_10d_SLA_prc INT =0;
+Declare @Lv_Total_Logged INT =0;
+Declare @Lv_Open_out_of_Logged INT =0;
+Declare @Lv_Closed_out_of_Logged INT =0;
+Declare @Lv_TOT_Resolved INT =0;
+Declare @Lv_Closed_Days_0_2 INT =0;
+Declare @Lv_Closed_Days_3_5 INT =0;
+Declare @Lv_Closed_Days_6_10 INT =0;
+Declare @Lv_Closed_Days_11_15 INT =0;
+Declare @Lv_Closed_Greater_15 INT =0;
+Declare @Lv_Closed_IN_10d_SLA_prc INT =0;
+Declare @Lv_Closed_OUT_10d_SLA_prc INT =0;
+Declare @Lv_Fail_1 INT =0;
+Declare @Lv_Fail_2 INT =0;
+Declare @Lv_Fail_3 INT =0;
+
+/* Variables to store data locally */
+Declare @V_Example_Case_ID varchar(30);
+Declare @V_Days_Open INT;
+Declare @V_Fail_Point1 INT =0;
+Declare @V_Fail_Point2 INT =0;
+Declare @V_Fail_Point3 INT =0;
+Declare @A_Status varchar(30);
+
+ 
+/*Cursor for all the Sample names*/
+DECLARE Sample_name_cursor CURSOR FOR 
+SELECT DISTINCT Sample 
+from [database].[dbo].[Table_Ext_Table_Test];
+
+OPEN Sample_name_cursor;
+
+FETCH NEXT FROM Sample_name_cursor INTO @Lv_Sample;
+WHILE (@@FETCH_STATUS =0)
+BEGIN
+
+/*Cursor for fetching the Sample names one by one*/
+DECLARE work_item_cursor CURSOR FOR 
+SELECT Example_Case_ID, Days_Open, Fail_Point_1, Fail_Point_2, Fail_Point_3
+from [database].[dbo].[Table_Ext_Table_Test]
+where Sample=@Lv_Sample
+AND CREATED_DATE < @p_end_date;
+
+OPEN work_item_cursor;
+
+FETCH NEXT FROM
+ work_item_cursor INTO @V_Example_Case_ID,@V_Days_Open, @V_Fail_Point1, @V_Fail_Point2, @V_Fail_Point3;
+
+WHILE (@@FETCH_STATUS =0)
+
+BEGIN
+/*Sub Loop for fetching the workitems of a Samplename one by one**/
+
+SELECT top 1 @A_Status = [Status] FROM 
+[database].[dbo].[Table_Workitem_Status_Audit_Table]
+where Example_Case_ID=@V_Example_Case_ID
+and Event_date <= @p_end_date
+order by Event_date desc; 
+
+/* Conditional Processing as per Work Item Status */
+IF (@A_Status='Open')
+BEGIN
+SET @Lv_TOT_Open = @Lv_TOT_Open + 1;
+
+IF @V_Days_Open >=0 AND @V_Days_Open <=2
+BEGIN 
+SET @Lv_Open_Days_0_2 = @Lv_Open_Days_0_2 +1;
+END 
+
+IF @V_Days_Open >=3 AND @V_Days_Open <=5
+BEGIN 
+SET @Lv_Open_Days_3_5 = @Lv_Open_Days_3_5 +1;
+END 
+
+IF @V_Days_Open >=6 AND @V_Days_Open <=10
+BEGIN
+ SET @Lv_Open_Days_6_10 = @Lv_Open_Days_6_10 +1;
+END  
+
+IF @V_Days_Open >=11 AND @V_Days_Open <=15
+BEGIN 
+SET @Lv_Open_Days_11_15 = @Lv_Open_Days_11_15 +1;
+END  
+
+IF @V_Days_Open >15
+BEGIN 
+SET @Lv_Open_Greater_15 = @Lv_Open_Greater_15 +1;
+END 
+
+IF @V_Fail_Point1 IS NOT NULL
+BEGIN 
+SET @Lv_Fail_1 = @Lv_Fail_1 +1;
+END 
+
+IF @V_Fail_Point2 IS NOT NULL
+BEGIN 
+SET @Lv_Fail_2 = @Lv_Fail_2 +1;
+END 
+
+IF @V_Fail_Point3 IS NOT NULL
+BEGIN 
+SET @Lv_Fail_3 = @Lv_Fail_3 +1;
+END 
+
+END
+
+FETCH NEXT FROM
+ work_item_cursor INTO @V_Example_Case_ID,@V_Days_Open, @V_Fail_Point1, @V_Fail_Point2, @V_Fail_Point3;
+END
+
+CLOSE work_item_cursor
+DEALLOCATE work_item_cursor
+
+ /* Calulating @Lv_Total_Logged */  
+SELECT @Lv_Total_Logged = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST1
+WHERE MST1.Created_Date <= @p_end_date
+AND MST1.Created_Date >= @p_start_date
+AND MST1.Sample = @Lv_Sample;
+
+ /* Calulating @Lv_Open_out_of_Logged  */
+ SELECT @Lv_Open_out_of_Logged = count(*) FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST2
+WHERE MST2.Created_Date <= @p_end_date
+AND MST2.Created_Date >= @p_start_date
+AND MST2.Sample = @Lv_Sample
+AND MST2.STATUS!='Closed resolved';
+
+ /* Calulating @Lv_Closed_out_of_Logged  */
+  SELECT @Lv_Closed_out_of_Logged = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST3
+WHERE MST3.Created_Date <= @p_end_date
+AND MST3.Created_Date >= @p_start_date
+AND MST3.Sample = @Lv_Sample
+AND MST3.STATUS='Closed resolved';
+
+ /* Calulating @Lv_TOT_Resolved */
+ SELECT @Lv_TOT_Resolved = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST4
+WHERE MST4.Resolved_Date <= @p_end_date
+AND MST4.Resolved_Date >= @p_start_date
+AND MST4.Sample = @Lv_Sample
+AND MST4.STATUS='Closed resolved';
+
+/* If @Lv_TOT_Resolved equal O */
+IF (@Lv_TOT_Resolved=0)
+BEGIN
+  SET @Lv_TOT_Resolved=1
+END
+
+/* If @Lv_TOT_Open equal O */
+IF (@Lv_TOT_Open=0)
+BEGIN
+   SET @Lv_TOT_Open=1
+END
+
+
+ /* Calulating @Lv_Closed_Days_0_2  */
+ SELECT @Lv_Closed_Days_0_2 = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST5
+WHERE MST5.Sample = @Lv_Sample
+AND MST5.STATUS='Closed resolved'
+AND MST5.Resolved_Date <= @p_end_date
+AND MST5.Resolved_Date >= @p_start_date
+AND Number_of_days_to_Close <=2
+AND Number_of_days_to_Close >=0;
+
+ /* Calulating @Lv_Closed_Days_3_5  */
+  SELECT @Lv_Closed_Days_3_5 = count(*)   FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST5
+WHERE MST5.Sample = @Lv_Sample
+AND MST5.STATUS='Closed resolved'
+AND MST5.Resolved_Date <= @p_end_date
+AND MST5.Resolved_Date >= @p_start_date
+AND Number_of_days_to_Close <=5
+AND Number_of_days_to_Close >=3;
+
+ /* Calulating @Lv_Closed_Days_6_10  */
+   SELECT @Lv_Closed_Days_6_10 = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST5
+WHERE MST5.Sample = @Lv_Sample
+AND MST5.STATUS='Closed resolved'
+AND MST5.Resolved_Date <= @p_end_date
+AND MST5.Resolved_Date >= @p_start_date
+AND Number_of_days_to_Close <=10
+AND Number_of_days_to_Close >=6;
+
+ /* Calulating @Lv_Closed_Days_11_15  */
+   SELECT @Lv_Closed_Days_11_15 = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST5
+WHERE MST5.Sample = @Lv_Sample
+AND MST5.STATUS='Closed resolved'
+AND MST5.Resolved_Date <= @p_end_date
+AND MST5.Resolved_Date >= @p_start_date
+AND Number_of_days_to_Close <=15
+AND Number_of_days_to_Close >=11;
+
+ /* Calulating @Lv_Closed_Greater_15  */
+   SELECT @Lv_Closed_Greater_15 = count(*)  FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST5
+WHERE MST5.Sample = @Lv_Sample
+AND MST5.Resolved_Date <= @p_end_date
+AND MST5.Resolved_Date >= @p_start_date
+AND MST5.STATUS='Closed resolved'
+AND Number_of_days_to_Close >15;
+
+ /* Calulating @Lv_Closed_IN_10d_SLA_prc  */
+ SELECT @Lv_Closed_IN_10d_SLA_prc = ((count(*) *100)/ (ISNULL(@Lv_TOT_Resolved,1)))
+FROM 
+[database].[dbo].[Table_Ext_Table_Test] MST5
+WHERE MST5.Sample = @Lv_Sample
+AND MST5.STATUS='Closed resolved'
+AND MST5.Resolved_Date <= @p_end_date
+AND MST5.Resolved_Date >= @p_start_date
+AND Number_of_days_to_Close <=10;
+
+/* Calulating @Lv_Closed_OUT_10d_SLA_prc */
+
+SET @Lv_Closed_OUT_10d_SLA_prc = 100 - @Lv_Closed_IN_10d_SLA_prc;
+
+ 
+
+/* Calulating @Lv_Open_IN_10d_SLA_prc  */
+ 
+SET @Lv_Open_IN_10d_SLA_prc = (@Lv_Open_Days_0_2 + @Lv_Open_Days_3_5 + @Lv_Open_Days_6_10) * 100 /(ISNULL(@Lv_TOT_Open,1));
+/* Calulating @@Lv_Open_OUT_10d_SLA_prc */
+
+SET @Lv_Open_OUT_10d_SLA_prc = 100 - @Lv_Open_IN_10d_SLA_prc;
+
+INSERT INTO #Table_Sample_Wise_Summary_Report_Temp_Table
+           ([Sample]
+           ,[Total_Logged]
+           ,[Open_out_of_Logged]
+           ,[Closed_out_of_Logged]
+           ,[TOT_Resolved]
+           ,[Resolved_Days_0_2]
+           ,[Resolved_Days_3_5]
+           ,[Resolved_Days_6_10]
+           ,[Resolved_Days_11_15]
+           ,[Resolved_Greater_15]
+           ,[Resolved_IN_10d_SLA_prc]
+           ,[Resolved_OUT_10d_SLA_prc]
+           ,[TOT_Open]
+           ,[Open_Days_0_2]
+           ,[Open_Days_3_5]
+           ,[Open_Days_6_10]
+           ,[Open_Days_11_15]
+           ,[Open_Greater_15]
+           ,[Open_IN_10d_SLA_prc]
+           ,[Open_OUT_10d_SLA_prc]
+           ,[Fail_1]
+           ,[Fail_2]
+           ,[Fail_3])
+     VALUES
+           (
+		    @Lv_Sample,		     
+			@Lv_Total_Logged, 
+			@Lv_Open_out_of_Logged ,
+			@Lv_Closed_out_of_Logged ,
+			@Lv_TOT_Resolved ,
+			@Lv_Closed_Days_0_2 ,
+			@Lv_Closed_Days_3_5 ,
+			@Lv_Closed_Days_6_10 ,
+			@Lv_Closed_Days_11_15 ,
+			@Lv_Closed_Greater_15 ,
+			@Lv_Closed_IN_10d_SLA_prc ,
+			@Lv_Closed_OUT_10d_SLA_prc ,                    
+            @Lv_TOT_Open
+           ,@Lv_Open_Days_0_2
+           ,@Lv_Open_Days_3_5
+           ,@Lv_Open_Days_6_10
+           ,@Lv_Open_Days_11_15
+           ,@Lv_Open_Greater_15
+           ,@Lv_Open_IN_10d_SLA_prc
+           ,@Lv_Open_OUT_10d_SLA_prc
+		   ,@Lv_Fail_1
+		   ,@Lv_Fail_2
+		   ,@Lv_Fail_3
+           ); 
+
+/* Reseting all the parameters for the execution of next Sample */
+SET @Lv_TOT_Open =0;
+SET @Lv_Open_Days_0_2 =0;
+SET @Lv_Open_Days_3_5  =0;
+SET @Lv_Open_Days_6_10  =0;
+SET @Lv_Open_Days_11_15  =0;
+SET @Lv_Open_Greater_15  =0;
+SET @Lv_Open_IN_10d_SLA_prc  =0;
+SET @Lv_Open_OUT_10d_SLA_prc =0;
+SET @Lv_Fail_1  =0;
+SET @Lv_Fail_2  =0;
+SET @Lv_Fail_3 =0;
+SET @Lv_Total_Logged  =0;
+SET @Lv_Open_out_of_Logged  =0;
+SET @Lv_Closed_out_of_Logged  =0;
+SET @Lv_TOT_Resolved  =0;
+SET @Lv_Closed_Days_0_2  =0;
+SET @Lv_Closed_Days_3_5  =0;
+SET @Lv_Closed_Days_6_10  =0;
+SET @Lv_Closed_Days_11_15  =0;
+SET @Lv_Closed_Greater_15  =0;
+SET @Lv_Closed_IN_10d_SLA_prc  =0;
+SET @Lv_Closed_OUT_10d_SLA_prc =0;
+
+
+FETCH NEXT FROM Sample_name_cursor INTO @Lv_Sample;
+
+END
+
+CLOSE Sample_name_cursor
+DEALLOCATE Sample_name_cursor
+
+/* Passing Data as Report */
+select * from #Table_Sample_Wise_Summary_Report_Temp_Table with(nolock)
+
+END
